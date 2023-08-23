@@ -10,6 +10,7 @@
   import { formSchema } from './dept.data';
 
   import { getDeptList } from '/@/api/demo/system';
+
   export default defineComponent({
     name: 'DeptModal',
     components: { BasicModal, BasicForm },
@@ -19,6 +20,7 @@
 
       const [registerForm, { resetFields, setFieldsValue, updateSchema, validate }] = useForm({
         labelWidth: 100,
+        baseColProps: { span: 24 },
         schemas: formSchema,
         showActionButtonGroup: false,
       });

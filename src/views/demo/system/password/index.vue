@@ -15,12 +15,14 @@
   import { BasicForm, useForm } from '/@/components/Form';
 
   import { formSchema } from './pwd.data';
+
   export default defineComponent({
     name: 'ChangePassword',
     components: { BasicForm, PageWrapper },
     setup() {
       const [register, { validate, resetFields }] = useForm({
         size: 'large',
+        baseColProps: { span: 24 },
         labelWidth: 100,
         showActionButtonGroup: false,
         schemas: formSchema,

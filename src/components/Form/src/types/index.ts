@@ -106,6 +106,7 @@ export type ComponentType =
   | 'RangePicker'
   | 'WeekPicker'
   | 'TimePicker'
+  | 'TimeRangePicker'
   | 'Switch'
   | 'StrengthMeter'
   | 'Upload'
@@ -113,4 +114,5 @@ export type ComponentType =
   | 'Render'
   | 'Slider'
   | 'Rate'
-  | 'Divider';
+  | 'Divider'
+  | 'ApiTransfer';

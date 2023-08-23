@@ -3,7 +3,7 @@ import { dateUtil } from '/@/utils/dateUtil';
 import { unref } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import type { FormProps, FormSchema } from '../types/form';
-import { set } from 'lodash-es';
+import { cloneDeep, set } from 'lodash-es';
 
 interface UseFormValuesContext {
   defaultValueRef: Ref<any>;
@@ -76,7 +76,12 @@ export function useFormValues({
       }
       // Remove spaces
       if (isString(value)) {
-        value = value.trim();
+        // remove params from URL
+        if (value === '') {
+          value = undefined;
+        } else {
+          value = value.trim();
+        }
       }
       if (!tryDeconstructArray(key, value, res) && !tryDeconstructObject(key, value, res)) {
         // 没有解构成功的，按原样赋值
@@ -97,14 +102,21 @@ export function useFormValues({
     }
 
     for (const [field, [startTimeKey, endTimeKey], format = 'YYYY-MM-DD'] of fieldMapToTime) {
-      if (!field || !startTimeKey || !endTimeKey || !values[field]) {
+      if (!field || !startTimeKey || !endTimeKey) {
+        continue;
+      }
+      // If the value to be converted is empty, remove the field
+      if (!values[field]) {
+        Reflect.deleteProperty(values, field);
         continue;
       }
 
       const [startTime, endTime]: string[] = values[field];
 
-      values[startTimeKey] = dateUtil(startTime).format(format);
-      values[endTimeKey] = dateUtil(endTime).format(format);
+      const [startTimeFormat, endTimeFormat] = Array.isArray(format) ? format : [format, format];
+
+      values[startTimeKey] = dateUtil(startTime).format(startTimeFormat);
+      values[endTimeKey] = dateUtil(endTime).format(endTimeFormat);
       Reflect.deleteProperty(values, field);
     }
 
@@ -115,13 +127,25 @@ export function useFormValues({
     const schemas = unref(getSchema);
     const obj: Recordable = {};
     schemas.forEach((item) => {
-      const { defaultValue } = item;
+      const { defaultValue, defaultValueObj } = item;
+      const fieldKeys = Object.keys(defaultValueObj || {});
+      if (fieldKeys.length) {
+        fieldKeys.map((field) => {
+          obj[field] = defaultValueObj![field];
+          if (formModel[field] === undefined) {
+            formModel[field] = defaultValueObj![field];
+          }
+        });
+      }
       if (!isNullOrUnDef(defaultValue)) {
         obj[item.field] = defaultValue;
-        formModel[item.field] = defaultValue;
+
+        if (formModel[item.field] === undefined) {
+          formModel[item.field] = defaultValue;
+        }
       }
     });
-    defaultValueRef.value = obj;
+    defaultValueRef.value = cloneDeep(obj);
   }
 
   return { handleFormValues, initDefault };
