@@ -1,10 +1,19 @@
 import type { BasicTableProps, TableRowSelection, BasicColumn } from '../types/table';
 import { Ref, ComputedRef, ref, computed, unref, nextTick, watch } from 'vue';
-import { getViewportOffset } from '/@/utils/domUtils';
-import { isBoolean } from '/@/utils/is';
+import { getViewportOffset } from '@/utils/domUtils';
+import { isBoolean } from '@/utils/is';
 import { useWindowSizeFn, onMountedOrActivated } from '@vben/hooks';
-import { useModalContext } from '/@/components/Modal';
-import { useDebounceFn } from '@vueuse/core';
+import { useModalContext } from '@/components/Modal';
+import { useDebounceFn, promiseTimeout } from '@vueuse/core';
+
+import {
+  footerHeight as layoutFooterHeight,
+  layoutMultipleHeadePlaceholderTime,
+} from '@/settings/designSetting';
+
+import { useRootSetting } from '@/hooks/setting/useRootSetting';
+
+const { getShowFooter, getFullContent } = useRootSetting();
 
 export function useTableScroll(
   propsRef: ComputedRef<BasicTableProps>,
@@ -27,8 +36,20 @@ export function useTableScroll(
   });
 
   watch(
-    () => [unref(getCanResize), unref(getDataSourceRef)?.length],
+    () => [unref(getCanResize), unref(getDataSourceRef)?.length, unref(getShowFooter)],
     () => {
+      debounceRedoHeight();
+    },
+    {
+      flush: 'post',
+    },
+  );
+
+  watch(
+    () => [unref(getFullContent)],
+    async () => {
+      // 等待动画结束后200毫秒
+      await promiseTimeout(layoutMultipleHeadePlaceholderTime * 1000 + 200);
       debounceRedoHeight();
     },
     {
@@ -92,8 +113,8 @@ export function useTableScroll(
   }
 
   function caclFooterHeight(tableEl: Element): number {
-  const { pagination } = unref(propsRef);
-   let footerHeight = 0;
+    const { pagination } = unref(propsRef);
+    let footerHeight = 0;
     if (!isBoolean(pagination)) {
       if (!footerEl) {
         footerEl = tableEl.querySelector('.ant-table-footer') as HTMLElement;
@@ -113,7 +134,7 @@ export function useTableScroll(
     return headerHeight;
   }
 
-   function calcBottomAndPaddingHeight(tableEl: Element, headEl: Element) {
+  function calcBottomAndPaddingHeight(tableEl: Element, headEl: Element) {
     const { pagination, isCanResizeParent, useSearchForm } = unref(propsRef);
     // Table height from bottom height-custom offset
     let paddingHeight = 30;
@@ -145,7 +166,7 @@ export function useTableScroll(
       // Table height from bottom
       bottomIncludeBody = getViewportOffset(headEl).bottomIncludeBody;
     }
-     
+
     return {
       paddingHeight,
       bottomIncludeBody,
@@ -168,7 +189,7 @@ export function useTableScroll(
     }
 
     handleScrollBar(bodyEl, tableEl);
-    
+
     bodyEl!.style.height = 'unset';
 
     if (!unref(getCanResize) || !unref(tableData) || tableData.length === 0) return;
@@ -179,19 +200,22 @@ export function useTableScroll(
     const headEl = tableEl.querySelector('.ant-table-thead ');
 
     if (!headEl) return;
-    
+
     const paginationHeight = caclPaginationHeight(tableEl);
     const footerHeight = caclFooterHeight(tableEl);
     const headerHeight = calcHeaderHeight(headEl);
     const { paddingHeight, bottomIncludeBody } = calcBottomAndPaddingHeight(tableEl, headEl);
-    
+
     let height =
       bottomIncludeBody -
       (resizeHeightOffset || 0) -
       paddingHeight -
       paginationHeight -
       footerHeight -
-      headerHeight;
+      headerHeight -
+      (getShowFooter.value ? layoutFooterHeight : 0) -
+      // 取高度ceil值
+      1;
     height = (height > maxHeight! ? (maxHeight as number) : height) ?? height;
     setHeight(height);
 
@@ -218,7 +242,9 @@ export function useTableScroll(
     columns.forEach((item) => {
       width += Number.parseFloat(item.width as string) || 0;
     });
-    const unsetWidthColumns = columns.filter((item) => !Reflect.has(item, 'width'));
+    const unsetWidthColumns = columns.filter(
+      (item) => !Reflect.has(item, 'width') && item.ifShow !== false,
+    );
 
     const len = unsetWidthColumns.length;
     if (len !== 0) {
